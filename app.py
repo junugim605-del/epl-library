@@ -173,6 +173,34 @@ TEAM_CONFIG = {
         "accent_color": "#ffffff",
         "slogan": "YOU REDS",
         "sub_slogan": "FOREST"
+    },
+        "Burnley": {
+        "logo": "https://upload.wikimedia.org/wikipedia/en/0/02/Burnley_FC_badge.png",
+        "main_color": "#6C1D45",
+        "accent_color": "#99D6EA",
+        "slogan": "UP THE CLARETS",
+        "sub_slogan": "THE CLARETS"
+    },
+    "Sunderland": {
+        "logo": "https://upload.wikimedia.org/wikipedia/en/7/77/Sunderland_AFC_logo.png",
+        "main_color": "#EB172B",
+        "accent_color": "#ffffff",
+        "slogan": "HA'WAY THE LADS",
+        "sub_slogan": "THE BLACK CATS"
+    },
+    "Hull City": {
+        "logo": "https://upload.wikimedia.org/wikipedia/en/a/a9/Hull_City_AFC_logo.svg",
+        "main_color": "#F5A623",
+        "accent_color": "#000000",
+        "slogan": "CITY TILL WE DIE",
+        "sub_slogan": "THE TIGERS"
+    },
+    "Coventry City": {
+        "logo": "https://upload.wikimedia.org/wikipedia/en/1/1a/Coventry_City_FC_logo.svg",
+        "main_color": "#00AEEF",
+        "accent_color": "#ffffff",
+        "slogan": "SKY BLUE ARMY",
+        "sub_slogan": "THE SKY BLUES"
     }
 }
 SEASONS = ["2025", "2026", "2027"]
