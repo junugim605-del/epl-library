@@ -192,7 +192,6 @@ def season_mvp_book(df, season):
     mvp = sdf[sdf["장르"] == top_genre].iloc[0]
 
     return mvp
-# ===================== 로그인 (Supabase Auth 2번 전술) =====================
 # ===================== 로그인 (Supabase Auth 2번 전술 통합본) =====================
 def check_password():
     # 1. 이미 로그인 상태라면 통과
@@ -202,7 +201,6 @@ def check_password():
     st.title("⚽ CLUB MEMBERSHIP")
     tab1, tab2 = st.tabs(["🔒 로그인", "📝 회원가입"])
 
-    # ------------------- 탭 1: 로그인 -------------------
 # ------------------- 탭 1: 로그인 -------------------
     with tab1:
         col1, col2 = st.columns([1, 2])
@@ -212,33 +210,48 @@ def check_password():
             login_id = st.text_input("ID (아이디)", key="final_login_id")
             login_pw = st.text_input("PASSWORD (비밀번호)", type="password", key="final_login_pw")
             
-            # 여기가 바로 그 위치입니다!
+
             if st.button("LOGIN", key="final_login_btn"):
                 if login_id and login_pw:
                     try:
-                        # 1️⃣ 가짜 이메일 꼼수 적용
+                        # 로그인 전용 Supabase 클라이언트 생성
+                        user_client = create_client(
+                            st.secrets["SUPABASE_URL"],
+                            st.secrets["SUPABASE_KEY"]
+                        )
+
+                        # Supabase Auth 로그인
                         fake_email = f"{login_id}@club.com"
-                        
-                        # 2️⃣ 공식 Auth 로그인 시도
-                        res = supabase.auth.sign_in_with_password({
+                        res = user_client.auth.sign_in_with_password({
                             "email": fake_email,
                             "password": login_pw
                         })
-                        
-                        # 3️⃣ 로그인 성공 시 처리
-                        if res.user:
-                            # 프로필 테이블에서 유저 정보(팀 등) 가져오기
-                            p_res = supabase.table("profiles").select("*").eq("id", res.user.id).execute()
-                            
+
+                        if res.user and res.session:
+                            # 로그인한 사용자의 프로필 조회
+                            p_res = (
+                                user_client.table("profiles")
+                                .select("team_name")
+                                .eq("id", str(res.user.id))
+                                .execute()
+                            )
+
+                            # 로그인 상태 저장
                             st.session_state.auth = True
-                            st.session_state.user_id = login_id 
-                            st.session_state.user_uuid = res.user.id # UUID 저장
-                            st.session_state.user_team = p_res.data[0]["team_name"] if p_res.data else "Tottenham"
-                            
+                            st.session_state.user_id = login_id
+                            st.session_state.user_uuid = str(res.user.id)
+                            st.session_state.user_team = (
+                                p_res.data[0]["team_name"]
+                                if p_res.data else "Tottenham"
+                            )
+                            st.session_state.supabase_client = user_client
+
                             st.success(f"✅ {login_id} 구단주님, 환영합니다!")
                             st.rerun()
-                    except Exception as e:
-                        # 아이디/비번 틀리면 여기로 빠짐
+                        else:
+                            st.error("🚫 로그인을 완료하지 못했습니다.")
+
+                    except Exception:
                         st.error("🚫 아이디 또는 비밀번호가 틀렸습니다!")
                 else:
                     st.warning("아이디와 비밀번호를 입력해주세요.")
@@ -339,9 +352,15 @@ if check_password():
 
     # 3. 이후 DB 로드 로직 시작...
     try:
-        response = supabase.table("books").select("*").eq("username", st.session_state.user_id).execute()
-        # ... (이하 기존 코드 그대로)
-        
+db = st.session_state.supabase_client
+
+response = (
+    db.table("books")
+    .select("*")
+    .eq("user_id", st.session_state.user_uuid)
+    .execute()
+)
+
         if response.data:
             # 가져온 데이터를 판다스 데이터프레임으로 변환
             library_df = pd.DataFrame(response.data)
@@ -391,9 +410,23 @@ if check_password():
 # 사이드바 하단에 로그아웃 버튼 배치
     st.sidebar.markdown("---")
     if st.sidebar.button("🚪 전술 후퇴 (로그아웃)"):
+        # Supabase Auth 로그아웃
+        try:
+            db = st.session_state.get("supabase_client")
+            if db:
+                db.auth.sign_out()
+        except Exception:
+            pass
+
+        # 세션 정보 초기화
         st.session_state.auth = False
         st.session_state.user_id = None
+        st.session_state.user_uuid = None
+        st.session_state.user_team = None
+        st.session_state.supabase_client = None
+
         st.rerun()
+
     # ===================== 홈 (메인 화면 박스 색상 수정) =====================
     if menu == "🏟️ 홈":
         st.markdown(f"<h1 style='color:{config['main_color']};'>MATCH DAY</h1>", unsafe_allow_html=True)
@@ -451,7 +484,6 @@ if check_password():
                     </div>
                     """, unsafe_allow_html=True)
 
-    # ===================== 신규 영입 =====================
 # ===================== 신규 영입 =====================
     elif menu == "📝 신규 영입":
         st.markdown(f"<h1 style='color:{config['main_color']};'>NEW SIGNING</h1>", unsafe_allow_html=True)
@@ -465,20 +497,22 @@ if check_password():
             memo = st.text_area("메모")
             ok = st.form_submit_button("영입")
 
+
         if ok:
             if not title or not author:
                 st.warning("⚠️ 책 제목과 저자는 필수 영입 조건입니다!")
             elif not st.session_state.get("user_id"):
                 st.error("❌ 로그인 세션이 만료되었습니다. 다시 로그인해주세요.")
+            elif not st.session_state.get("user_uuid"):
+                st.error("❌ 사용자 인증 정보가 없습니다. 다시 로그인해주세요.")
+            elif not st.session_state.get("supabase_client"):
+                st.error("❌ 데이터베이스 세션이 없습니다. 다시 로그인해주세요.")
             else:
                 try:
-                    # 1️⃣ 신분증(RPC) 제출 - DB에 '지금 나야!'라고 알림
-                    supabase.rpc("set_config", {
-                        "setting": "app.current_username", 
-                        "value": st.session_state.user_id
-                    }).execute()
+                    # 로그인한 사용자의 전용 클라이언트 사용
+                    db = st.session_state.supabase_client
 
-                    # 2️⃣ 데이터 준비 (DB 컬럼명에 딱 맞게!)
+                    # 책 데이터 준비
                     new_book = {
                         "registered_at": pd.Timestamp.now().strftime("%Y-%m-%d"),
                         "title": title,
@@ -487,25 +521,23 @@ if check_password():
                         "genre": genre,
                         "season": str(season),
                         "username": st.session_state.user_id,
+                        "user_id": st.session_state.user_uuid,
                         "memo": memo
                     }
-                    
-                    # 3️⃣ 영입 슛! (딱 한 번만 실행)
-                    insert_res = supabase.table("books").insert(new_book).execute()
-                    
-                    # 4️⃣ 결과 확인 및 세레머니
+
+                    # 로그인한 사용자 계정으로 책 등록
+                    db.table("books").insert(new_book).execute()
+
                     st.success(f"⚽ {title} 영입 완료! 스쿼드에 등록되었습니다.")
                     st.balloons()
-                    st.rerun() 
+                    st.rerun()
 
                 except Exception as e:
-                    # RLS 정책 위반(42501) 발생 시 더 친절하게 안내
                     if "42501" in str(e):
-                        st.error("🚫 보안 정책(RLS) 승인이 거절되었습니다. SQL 정책 설정을 확인해 주세요!")
+                        st.error("🚫 오류가 발생했습니다. 관리자에게 문의해 주세요! 문의시 문의 코드42501을 말해주세요.")
                     else:
                         st.error(f"🚑 영입 중 부상 발생: {e}")
 
-            # 이 밑에 있던 library_df = pd.read_csv... 줄은 삭제됐어야 함!
              # ⭐ CSV 다시 불러오기 + 시즌 컬럼 문자열로 강제
     elif menu == "📋 스쿼드":
         q = st.text_input("🔍 검색")
@@ -549,17 +581,20 @@ if check_password():
                 with col2:
                     # ⭐ 핵심: 버튼 클릭 시 신분증(rpc)을 먼저 제출하고 삭제 진행!
                     if st.button("방출", key=f"del_{r['id']}"):
-                        try:
-                            # 1. "나 이 구단주 맞아!" 신분증 제출
-                            supabase.rpc("set_config", {
-                                "setting": "app.current_username", 
-                                "value": st.session_state.user_id
-                            }).execute()
 
-                            # 2. 삭제 슛!
-                            supabase.table("books").delete().eq("id", r['id']).execute()
-                            
+                        try:
+                            # 로그인한 사용자의 전용 클라이언트 사용
+                            db = st.session_state.supabase_client
+
+                            # 본인 UUID와 책 ID가 모두 일치할 때만 삭제
+                            db.table("books").delete().eq(
+                                "id", r["id"]
+                            ).eq(
+                                "user_id", st.session_state.user_uuid
+                            ).execute()
+
                             st.toast(f"🚪 {r['책이름']} 방출 완료!", icon="⚽")
-                            st.rerun()  # 즉시 명단 업데이트
+                            st.rerun()
+
                         except Exception as e:
                             st.error(f"방출 실패: {e}")
