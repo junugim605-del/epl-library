@@ -292,8 +292,6 @@ def check_password():
 
 # ===================== 메인 =====================
 if check_password():
-    # DB 작업 하기 바로 직전에 이 쿼리를 먼저 날려줘야 RLS를 통과합니다!
-    supabase.rpc("set_config", {"setting": "app.current_username", "value": st.session_state.user_id}).execute()
     # 1. 팀 정보 가져오기 (이건 그대로 유지!)
     user_team = st.session_state.get("user_team", "Tottenham")
     config = TEAM_CONFIG.get(user_team, TEAM_CONFIG["Tottenham"])
@@ -350,39 +348,43 @@ if check_password():
     </style>
     """, unsafe_allow_html=True)
 
+
     # 3. 이후 DB 로드 로직 시작...
-try:
-    db = st.session_state.supabase_client
+    try:
+        db = st.session_state.supabase_client
 
-    response = (
-        db.table("books")
-        .select("*")
-        .eq("user_id", st.session_state.user_uuid)
-        .execute()
-    )
+        response = (
+            db.table("books")
+            .select("*")
+            .eq("user_id", st.session_state.user_uuid)
+            .execute()
+        )
 
-    if response.data:
-        library_df = pd.DataFrame(response.data)
-        library_df = library_df.rename(columns={
-            "title": "책이름",
-            "author": "저자",
-            "publisher": "출판사",
-            "genre": "장르",
-            "season": "시즌",
-            "memo": "메모",
-            "registered_at": "등록일"
-        })
+        if response.data:
+            library_df = pd.DataFrame(response.data)
+            library_df = library_df.rename(columns={
+                "title": "책이름",
+                "author": "저자",
+                "publisher": "출판사",
+                "genre": "장르",
+                "season": "시즌",
+                "memo": "메모",
+                "registered_at": "등록일"
+            })
         else:
-            # DB가 텅 비어있을 때 (첫 실행 시)
-            library_df = pd.DataFrame(columns=["등록일","책이름","저자","출판사","장르","시즌","메모"])
-            
-    except Exception as e:
-        st.error(f"DB 연결 중 부상 발생(에러): {e}")
-        library_df = pd.DataFrame(columns=["등록일","책이름","저자","출판사","장르","시즌","메모"])
+            library_df = pd.DataFrame(
+                columns=["등록일", "책이름", "저자", "출판사", "장르", "시즌", "메모"]
+            )
 
-    # 시즌 컬럼 문자열 강제 (기존 로직 유지)
+    except Exception as e:
+        st.error(f"DB 연결 중 부 발생: {e}")
+        library_df = pd.DataFrame(
+            columns=["등록일", "책이름", "저자", "출판사", "장르", "시즌", "메모"]
+        )
+
     library_df["시즌"] = library_df["시즌"].astype(str)
     total_books = len(library_df)
+
 # ---------- 사이드바 (팀별 로고 & 제목 자동 변경) ----------
     # (기존 spurs_logo 선언문은 지우고 이걸 넣으세요)
     st.sidebar.image(current_logo, width=150) 
