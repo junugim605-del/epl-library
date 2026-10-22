@@ -352,7 +352,7 @@ if check_password():
 
     # 3. 이후 DB 로드 로직 시작...
     try:
-db = st.session_state.supabase_client
+        db = st.session_state.supabase_client
 
 response = (
     db.table("books")
