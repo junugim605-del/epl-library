@@ -351,30 +351,27 @@ if check_password():
     """, unsafe_allow_html=True)
 
     # 3. 이후 DB 로드 로직 시작...
-    try:
-        db = st.session_state.supabase_client
+try:
+    db = st.session_state.supabase_client
 
-        response = (
-            db.table("books")
-            .select("*")
-            .eq("user_id", st.session_state.user_uuid)
-            .execute()
-        )
+    response = (
+        db.table("books")
+        .select("*")
+        .eq("user_id", st.session_state.user_uuid)
+        .execute()
+    )
 
-                if response.data:
-                    # 가져온 데이터를 판다스 데이터프레임으로 변환
-                    library_df = pd.DataFrame(response.data)
-            
-                    # DB의 영어 컬럼명을 앱에서 사용하는 한글 이름으로 변환 (매핑 작업)
-                    library_df = library_df.rename(columns={
-                        "title": "책이름", 
-                        "author": "저자", 
-                        "publisher": "출판사",
-                        "genre": "장르", 
-                        "season": "시즌", 
-                        "memo": "메모", 
-                        "registered_at": "등록일"
-                    })
+    if response.data:
+        library_df = pd.DataFrame(response.data)
+        library_df = library_df.rename(columns={
+            "title": "책이름",
+            "author": "저자",
+            "publisher": "출판사",
+            "genre": "장르",
+            "season": "시즌",
+            "memo": "메모",
+            "registered_at": "등록일"
+        })
         else:
             # DB가 텅 비어있을 때 (첫 실행 시)
             library_df = pd.DataFrame(columns=["등록일","책이름","저자","출판사","장르","시즌","메모"])
