@@ -529,8 +529,6 @@ if check_password():
 
                     st.success(f"⚽ {title} 영입 완료! 스쿼드에 등록되었습니다.")
                     st.balloons()
-                    st.rerun()
-
                 except Exception as e:
                     if "42501" in str(e):
                         st.error("🚫 오류가 발생했습니다. 관리자에게 문의해 주세요! 문의시 문의 코드42501을 말해주세요.")
